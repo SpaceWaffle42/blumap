@@ -1,5 +1,0 @@
-os,os accuracy,protocol,portid,state,reason,reason_ttl,service,cpe,scripts
-Linux 3.2 - 3.16,93%,,,,,,,,
-,,tcp,53,open,syn-ack,64,"{'name': 'domain', 'method': 'table', 'conf': '3'}",,
-,,tcp,80,open,syn-ack,1,"{'name': 'http', 'method': 'table', 'conf': '3'}",,
-,,tcp,443,open,syn-ack,1,"{'name': 'https', 'method': 'table', 'conf': '3'}",,
