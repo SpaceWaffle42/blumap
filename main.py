@@ -75,7 +75,7 @@ def main():
         if usage_type == '1' or usage_type == '2' or usage_type == 'manual' or usage_type == 'automated' or usage_type =='':
             if usage_type == '':
                 default = config["SETTINGS"]["DEFAULT USAGE"]
-                print(f'No option selected, defaulting to {default}')
+                print(f'No option selected, defaulting to [{default}]')
                 usage_type = default
             loop = True
             if config['SETTINGS']["Identify Service Version"] == 'True':
@@ -125,14 +125,13 @@ def main():
                         except: print('FAILED TO PLAY SOUND!')
                 except:
                     pass
-            # df_path = os.path.join(py_path,'data',f'{host}_scan.csv')
 
         if loop == True:
             time.sleep(int(config['SETTINGS']["SLEEP"]))
             print(f'[{now}] Searching for new IPs...')
 
 if __name__ == "__main__":
-    subnets = ['192.168.1.0']
+    subnets = ['192.168.1.0','google.com']
 directories()
 config_create()
 initial()
