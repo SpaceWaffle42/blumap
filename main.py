@@ -1,16 +1,18 @@
 from nmap3 import Nmap
-import winsound
 import pandas as pd, numpy as np
 import ipaddress
 import configparser
 import pathlib, os
 import time
 import datetime
+import platform
+
+if platform.system() == "Windows":
+    import winsound
 
 config = configparser.ConfigParser()
 py_path = pathlib.Path(__file__).parent.resolve()
 
-pd.set_option('display.max_rows', 100)
 addresses = []
 subnets = []
 nmap = Nmap()
@@ -25,18 +27,22 @@ def directories():
 
 def config_create():
     if not os.path.exists(os.path.join(py_path, "config.ini")):
-        config.add_section("SETTINGS")
-        config.set("SETTINGS", "IDENTIFY SERVICE VERSION", "False")
-        config.set("SETTINGS", "SLEEP", "10")
-        config.set("SETTINGS", "DEFAULT USAGE", "1")
-        config.set("SETTINGS", "VIEW DATA", "False")
-        config.set("SETTINGS", "IP ONLY MODE", "False")
+        config.add_section("SEARCH SETTINGS")
+        config.set("SEARCH SETTINGS", "IDENTIFY SERVICE VERSION", "False")
+        config.set("SEARCH SETTINGS", "STEALTH SEARCH", "False")
 
+        config.add_section("DATA SETTINGS")
+        config.set("DATA SETTINGS", "VIEW DATA", "False")
+        config.set("DATA SETTINGS", "MAX ROW", "100")
+
+        config.add_section("MISC SETTINGS")
+        config.set("MISC SETTINGS", "DEFAULT USAGE", "1")
+        config.set("MISC SETTINGS", "SLEEP", "10")
+        config.set("MISC SETTINGS", "IP ONLY MODE", "False")
 
         with open((os.path.join(py_path, "config.ini")), "w") as configfile:
             config.write(configfile)
     return config
-
 config.read(os.path.join(py_path, "config.ini"))
 
 def initial():
@@ -53,7 +59,7 @@ def initial():
                   {subnets}
 ''')
             break
-        if config['SETTINGS']['IP ONLY MODE'] == 'False':
+        if config['MISC SETTINGS']['IP ONLY MODE'] == 'False':
             if address not in subnets:
                 subnets.append(address)
         else:
@@ -74,18 +80,21 @@ def main():
                         ''').lower()
         if usage_type == '1' or usage_type == '2' or usage_type == 'manual' or usage_type == 'automated' or usage_type =='':
             if usage_type == '':
-                default = config["SETTINGS"]["DEFAULT USAGE"]
+                default = config["MISC SETTINGS"]["DEFAULT USAGE"]
                 print(f'No option selected, defaulting to [{default}]')
                 usage_type = default
             loop = True
-            if config['SETTINGS']["Identify Service Version"] == 'True':
+            if config['SEARCH SETTINGS']['STEALTH SEARCH'] == 'True' and config['SEARCH SETTINGS']["Identify Service Version"] == 'True':
+                print('Stealth and cpe cannot be active at the same time! ignoring "Identify Service Version"')
+                sub_scan_arg = '-O'
+            elif config['SEARCH SETTINGS']["Identify Service Version"] == 'True' and config['SEARCH SETTINGS']['STEALTH SEARCH'] == 'False':
                 print('''
         |===========================================================|
         |Please be PATIENT detecting cpe takes longer to proccess...|
         |===========================================================|
     ''')
-                sub_scan_arg='-O -sV'
-            else: sub_scan_arg='-O'
+                sub_scan_arg = '-O -sV'
+            else: sub_scan_arg = '-O'
             break
         else: print('\ninvalid usage type!\n')
     
@@ -97,8 +106,11 @@ def main():
         for i in subnets:
             now = datetime.datetime.now().strftime("%Y-%m-%d @%H:%M")
             target_subnet = i
-
-            sub_scan = nmap.nmap_subnet_scan(target_subnet,args=sub_scan_arg)
+            if config['SEARCH SETTINGS']['STEALTH SEARCH'] == 'True':
+                sub_scan = nmap.nmap_stealth_scan(target_subnet,arg=sub_scan_arg)
+                print('Performing Stealth Search...')
+            else:
+                sub_scan = nmap.nmap_subnet_scan(target_subnet,args=sub_scan_arg)
             for host, info in sub_scan.items():
                 try:
                     state = info['state']['state']
@@ -114,25 +126,27 @@ def main():
                         df = df.map(replace_empty_list)
                         df.to_csv('data/'+f'{host}_scan.csv')
 
-                        if config['SETTINGS']["VIEW DATA"] == 'True':
+                        if config['DATA SETTINGS']["VIEW DATA"] == 'True':
                             print(f'\n{host}\n{df}')
 
                     if host not in addresses and state == 'up':
                         addresses.append(host)
                         print(f'[{now}] new address found: {host}')
-                        try:
-                            winsound.PlaySound('ping.wav', winsound.SND_FILENAME)
-                        except: print('FAILED TO PLAY SOUND!')
+                        if platform.system() == "Windows":
+                            try:
+                                winsound.PlaySound('ping.wav', winsound.SND_FILENAME)
+                            except: print('FAILED TO PLAY SOUND!')
                 except:
                     pass
 
         if loop == True:
-            time.sleep(int(config['SETTINGS']["SLEEP"]))
+            time.sleep(int(config['MISC SETTINGS']["SLEEP"]))
             print(f'[{now}] Searching for new IPs...')
 
 if __name__ == "__main__":
-    subnets = ['192.168.1.0','google.com']
+    subnets = ['127.0.0.1']
 directories()
 config_create()
+pd.set_option('display.max_rows', int(config['DATA SETTINGS']['MAX ROW']))
 initial()
 main()
