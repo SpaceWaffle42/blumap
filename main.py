@@ -71,6 +71,7 @@ def initial():
                 print('Not a valid address!')
 
 def main():
+    old_df = pd.DataFrame()
     while True:
         usage_type = input('''
                         please select an option:
@@ -84,54 +85,76 @@ def main():
                 print(f'No option selected, defaulting to [{default}]')
                 usage_type = default
             loop = True
+
             if config['SEARCH SETTINGS']['STEALTH SEARCH'] == 'True' and config['SEARCH SETTINGS']["Identify Service Version"] == 'True':
                 print('Stealth and cpe cannot be active at the same time! ignoring "Identify Service Version"')
-                sub_scan_arg = '-O'
-            elif config['SEARCH SETTINGS']["Identify Service Version"] == 'True' and config['SEARCH SETTINGS']['STEALTH SEARCH'] == 'False':
+
+            if config['SEARCH SETTINGS']["Identify Service Version"] == 'True' and config['SEARCH SETTINGS']['STEALTH SEARCH'] == 'False':
                 print('''
         |===========================================================|
         |Please be PATIENT detecting cpe takes longer to proccess...|
         |===========================================================|
     ''')
-                sub_scan_arg = '-O -sV'
-            else: sub_scan_arg = '-O'
+                sub_scan_arg = '-sV'
+                
+            else:sub_scan_arg = '-O'
+
             break
         else: print('\ninvalid usage type!\n')
     
     while loop == True:
         if subnets == []:
+            print('''\n
+                  |================================|
+                  |      No Subnets provided!      |
+                  |         SHUTTING DOWN!         |
+                  |================================|
+                  ''')
             break
+
         if usage_type == '1' or usage_type == 'manual':
             loop = False
+        
         for i in subnets:
             now = datetime.datetime.now().strftime("%Y-%m-%d @%H:%M")
             target_subnet = i
             if config['SEARCH SETTINGS']['STEALTH SEARCH'] == 'True':
                 sub_scan = nmap.nmap_stealth_scan(target_subnet,arg=sub_scan_arg)
-                print('Performing Stealth Search...')
+
+                if 'error' in sub_scan:
+                    print(f'{sub_scan["msg"]} [Stealth Mode Enabled]')
+                else:
+                    print('Performing Stealth Search...')
             else:
                 sub_scan = nmap.nmap_subnet_scan(target_subnet,args=sub_scan_arg)
             for host, info in sub_scan.items():
                 try:
                     state = info['state']['state']
+
                     if state == 'up':
                         os_name = info['osmatch'][0]['name']
                         os_accuracy = info['osmatch'][0]['accuracy']
                         os = [{'os' : os_name, 'os accuracy' : os_accuracy+'%'}]
                         df_device_info = pd.DataFrame.from_dict(os)
                         df_net_info = pd.DataFrame.from_dict(info['ports'])
-                        df = pd.concat([df_device_info, df_net_info], ignore_index=True)
-                        df = df.set_index('os')
-                        replace_empty_list = lambda x: np.nan if isinstance(x, list) and not x else x
-                        df = df.map(replace_empty_list)
-                        df.to_csv('data/'+f'{host}_scan.csv')
+
+                        if df_net_info.equals(old_df):pass
+                        else:
+                            old_df = df_net_info
+                            df = pd.concat([df_device_info, df_net_info], ignore_index=True)
+                            df = df.set_index('os')
+                            replace_empty_list = lambda x: np.nan if isinstance(x, list) and not x else x
+                            df = df.map(replace_empty_list)
+                            df.to_csv('data/'+f'{host}_scan.csv')
 
                         if config['DATA SETTINGS']["VIEW DATA"] == 'True':
+                            pass
                             print(f'\n{host}\n{df}')
 
                     if host not in addresses and state == 'up':
                         addresses.append(host)
                         print(f'[{now}] new address found: {host}')
+
                         if platform.system() == "Windows":
                             try:
                                 winsound.PlaySound('ping.wav', winsound.SND_FILENAME)
