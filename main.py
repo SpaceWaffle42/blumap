@@ -17,13 +17,15 @@ addresses = []
 subnets = []
 nmap = Nmap()
 
+
 def directories():
-    DIR_DATA = os.path.join(py_path,'data')
+    DIR_DATA = os.path.join(py_path, "data")
     dir_check_data = os.path.isdir(DIR_DATA)
 
     if dir_check_data == False:
         os.mkdir(os.path.join(DIR_DATA))
-        print('Data folder created.')
+        print("Data folder created.")
+
 
 def config_create():
     if not os.path.exists(os.path.join(py_path, "config.ini")):
@@ -43,23 +45,30 @@ def config_create():
         with open((os.path.join(py_path, "config.ini")), "w") as configfile:
             config.write(configfile)
     return config
+
+
 config.read(os.path.join(py_path, "config.ini"))
 
+
 def initial():
-    print('''
+    print(
+        """
           Please provide the IPs one at a time
           This will add the items to a list
           Once you have finished adding either enter blank or type 'next'
-          ''')
+          """
+    )
     while True:
-        address = input('IP: ')
-        if address == '' or address == 'next':
-            print(f'''
+        address = input("IP: ")
+        if address == "" or address == "next":
+            print(
+                f"""
     The following addresses have been added: 
                   {subnets}
-''')
+"""
+            )
             break
-        if config['MISC SETTINGS']['IP ONLY MODE'] == 'False':
+        if config["MISC SETTINGS"]["IP ONLY MODE"] == "False":
             if address not in subnets:
                 subnets.append(address)
         else:
@@ -68,108 +77,138 @@ def initial():
                 if address not in subnets:
                     subnets.append(address)
             except ValueError:
-                print('Not a valid address!')
+                print("Not a valid address!")
+
 
 def main():
     old_df = pd.DataFrame()
     while True:
-        usage_type = input('''
+        usage_type = input(
+            """
                         please select an option:
                         [1]manual
                         [2]automated
                         =========================
-                        ''').lower()
-        if usage_type == '1' or usage_type == '2' or usage_type == 'manual' or usage_type == 'automated' or usage_type =='':
-            if usage_type == '':
+                        """
+        ).lower()
+        if (
+            usage_type == "1"
+            or usage_type == "2"
+            or usage_type == "manual"
+            or usage_type == "automated"
+            or usage_type == ""
+        ):
+            if usage_type == "":
                 default = config["MISC SETTINGS"]["DEFAULT USAGE"]
-                print(f'No option selected, defaulting to [{default}]')
+                print(f"No option selected, defaulting to [{default}]")
                 usage_type = default
             loop = True
 
-            if config['SEARCH SETTINGS']['STEALTH SEARCH'] == 'True' and config['SEARCH SETTINGS']["Identify Service Version"] == 'True':
-                print('Stealth and cpe cannot be active at the same time! ignoring "Identify Service Version"')
+            if (
+                config["SEARCH SETTINGS"]["STEALTH SEARCH"] == "True"
+                and config["SEARCH SETTINGS"]["Identify Service Version"] == "True"
+            ):
+                print(
+                    'Stealth and cpe cannot be active at the same time! ignoring "Identify Service Version"'
+                )
 
-            if config['SEARCH SETTINGS']["Identify Service Version"] == 'True' and config['SEARCH SETTINGS']['STEALTH SEARCH'] == 'False':
-                print('''
+            if (
+                config["SEARCH SETTINGS"]["Identify Service Version"] == "True"
+                and config["SEARCH SETTINGS"]["STEALTH SEARCH"] == "False"
+            ):
+                print(
+                    """
         |===========================================================|
         |Please be PATIENT detecting cpe takes longer to proccess...|
         |===========================================================|
-    ''')
-                sub_scan_arg = '-sV'
-                
-            else:sub_scan_arg = '-O'
+    """
+                )
+                sub_scan_arg = "-sV"
+
+            else:
+                sub_scan_arg = "-O"
 
             break
-        else: print('\ninvalid usage type!\n')
-    
+        else:
+            print("\ninvalid usage type!\n")
+
     while loop == True:
         if subnets == []:
-            print('''\n
+            print(
+                """\n
                   |================================|
                   |      No Subnets provided!      |
                   |         SHUTTING DOWN!         |
                   |================================|
-                  ''')
+                  """
+            )
             break
 
-        if usage_type == '1' or usage_type == 'manual':
+        if usage_type == "1" or usage_type == "manual":
             loop = False
-        
+
         for i in subnets:
             now = datetime.datetime.now().strftime("%Y-%m-%d @%H:%M")
             target_subnet = i
-            if config['SEARCH SETTINGS']['STEALTH SEARCH'] == 'True':
-                sub_scan = nmap.nmap_stealth_scan(target_subnet,arg=sub_scan_arg)
+            if config["SEARCH SETTINGS"]["STEALTH SEARCH"] == "True":
+                sub_scan = nmap.nmap_stealth_scan(target_subnet, arg=sub_scan_arg)
 
-                if 'error' in sub_scan:
+                if "error" in sub_scan:
                     print(f'{sub_scan["msg"]} [Stealth Mode Enabled]')
                 else:
-                    print('Performing Stealth Search...')
+                    print("Performing Stealth Search...")
             else:
-                sub_scan = nmap.nmap_subnet_scan(target_subnet,args=sub_scan_arg)
+                sub_scan = nmap.nmap_subnet_scan(target_subnet, args=sub_scan_arg)
             for host, info in sub_scan.items():
                 try:
-                    state = info['state']['state']
+                    state = info["state"]["state"]
 
-                    if state == 'up':
-                        os_name = info['osmatch'][0]['name']
-                        os_accuracy = info['osmatch'][0]['accuracy']
-                        os = [{'os' : os_name, 'os accuracy' : os_accuracy+'%'}]
+                    if state == "up":
+                        os_name = info["osmatch"][0]["name"]
+                        os_accuracy = info["osmatch"][0]["accuracy"]
+                        os = [{"os": os_name, "os accuracy": os_accuracy + "%"}]
                         df_device_info = pd.DataFrame.from_dict(os)
-                        df_net_info = pd.DataFrame.from_dict(info['ports'])
+                        df_net_info = pd.DataFrame.from_dict(info["ports"])
 
-                        if df_net_info.equals(old_df):pass
+                        if df_net_info.equals(old_df):
+                            pass
                         else:
                             old_df = df_net_info
-                            df = pd.concat([df_device_info, df_net_info], ignore_index=True)
-                            df = df.set_index('os')
-                            replace_empty_list = lambda x: np.nan if isinstance(x, list) and not x else x
+                            df = pd.concat(
+                                [df_device_info, df_net_info], ignore_index=True
+                            )
+                            df = df.set_index("os")
+                            replace_empty_list = (
+                                lambda x: np.nan if isinstance(x, list) and not x else x
+                            )
                             df = df.map(replace_empty_list)
-                            df.to_csv('data/'+f'{host}_scan.csv')
+                            df.to_csv("data/" + f"{host}_scan.csv")
 
-                        if config['DATA SETTINGS']["VIEW DATA"] == 'True':
+                        if config["DATA SETTINGS"]["VIEW DATA"] == "True":
                             pass
-                            print(f'\n{host}\n{df}')
+                            print(f"\n{host}\n{df}")
 
-                    if host not in addresses and state == 'up':
+                    if host not in addresses and state == "up":
                         addresses.append(host)
-                        print(f'[{now}] new address found: {host}')
+                        print(f"[{now}] new address found: {host}")
 
                         if platform.system() == "Windows":
                             try:
-                                winsound.PlaySound('ping.wav', winsound.SND_FILENAME)
-                            except: print('FAILED TO PLAY SOUND!')
+                                winsound.PlaySound("ping.wav", winsound.SND_FILENAME)
+                            except:
+                                print("FAILED TO PLAY SOUND!")
                 except:
                     pass
 
         if loop == True:
-            time.sleep(int(config['MISC SETTINGS']["SLEEP"]))
-            print(f'[{now}] Searching for new IPs...')
+            time.sleep(int(config["MISC SETTINGS"]["SLEEP"]))
+            print(f"[{now}] Searching for new IPs...")
+
 
 if __name__ == "__main__":
-    subnets = ['127.0.0.1']
+    subnets = ["127.0.0.1"]
 directories()
 config_create()
-pd.set_option('display.max_rows', int(config['DATA SETTINGS']['MAX ROW']))
+pd.set_option("display.max_rows", int(config["DATA SETTINGS"]["MAX ROW"]))
 initial()
 main()
