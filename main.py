@@ -187,7 +187,7 @@ def main():
                             df = df.map(replace_empty_list)
                             df.to_csv("data/" + f"{host}_scan.csv")
                             if config["DATA SETTINGS"]["VIEW DATA"] == "True":
-                                print(f"\n{host}\n{df}")
+                                print(f"\n[{now}] {host}\n{df}")
                                 
                     if host not in addresses and state == "up":
                         addresses.append(host)
