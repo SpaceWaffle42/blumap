@@ -22,6 +22,7 @@ nmap = Nmap()  # Nmap object for scanning
 
 ip_results = {}  # Dictionary to store scan results for each IP address
 
+
 # Function to create the 'data' directory if it doesn't exist
 def directories():
     DIR_DATA = os.path.join(py_path, "data")
@@ -30,6 +31,7 @@ def directories():
     if dir_check_data == False:
         os.mkdir(os.path.join(DIR_DATA))
         print("Data folder created.")
+
 
 # Function to create the configuration file if it doesn't exist
 def config_create():
@@ -51,8 +53,10 @@ def config_create():
             config.write(configfile)
     return config
 
+
 # Read configuration from the 'config.ini' file
 config.read(os.path.join(py_path, "config.ini"))
+
 
 # Function to input initial IP addresses
 def initial():
@@ -83,6 +87,7 @@ def initial():
                     subnets.append(address)
             except ValueError:
                 print("Not a valid address!")
+
 
 # Function for the main scanning logic
 def main():
@@ -140,7 +145,7 @@ def main():
             print("\ninvalid usage type!\n")
 
     while loop == True:
-        if subnets == []:
+        if not subnets:
             print(
                 """\n
                   |================================|
@@ -237,6 +242,7 @@ def main():
         if loop == True:
             time.sleep(int(config["MISC SETTINGS"]["SLEEP"]))
             print(f"\n\n[{now}] Searching for new IPs...")
+
 
 # Entry point of the script
 if __name__ == "__main__":
