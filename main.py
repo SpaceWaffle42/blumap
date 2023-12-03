@@ -204,7 +204,7 @@ def main():
                                     if isinstance(x, list) and not x
                                     else x
                                 )
-                                df = df.applymap(replace_empty_list)
+                                df = df.map(replace_empty_list)
                                 df.to_csv("data/" + f"{host}_scan.csv")
 
                                 if config["DATA SETTINGS"]["VIEW DATA"] == "True":
