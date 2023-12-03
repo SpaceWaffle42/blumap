@@ -7,19 +7,22 @@ import time
 import datetime
 import platform
 
+# Check if running on Windows for sound notifications
 if platform.system() == "Windows":
     import winsound
 
+# Initialize Nmap, configuration, and paths
 config = configparser.ConfigParser()
 py_path = pathlib.Path(__file__).parent.resolve()
 
-addresses = []
-subnets = []
-nmap = Nmap()
+# Lists and dictionaries to store data
+addresses = []  # List of IP addresses
+subnets = []  # List of subnets to scan
+nmap = Nmap()  # Nmap object for scanning
 
-ip_results = {}  # for use with comparing ips
+ip_results = {}  # Dictionary to store scan results for each IP address
 
-
+# Function to create the 'data' directory if it doesn't exist
 def directories():
     DIR_DATA = os.path.join(py_path, "data")
     dir_check_data = os.path.isdir(DIR_DATA)
@@ -28,7 +31,7 @@ def directories():
         os.mkdir(os.path.join(DIR_DATA))
         print("Data folder created.")
 
-
+# Function to create the configuration file if it doesn't exist
 def config_create():
     if not os.path.exists(os.path.join(py_path, "config.ini")):
         config.add_section("SEARCH SETTINGS")
@@ -48,10 +51,10 @@ def config_create():
             config.write(configfile)
     return config
 
-
+# Read configuration from the 'config.ini' file
 config.read(os.path.join(py_path, "config.ini"))
 
-
+# Function to input initial IP addresses
 def initial():
     print(
         """
@@ -81,9 +84,10 @@ def initial():
             except ValueError:
                 print("Not a valid address!")
 
-
+# Function for the main scanning logic
 def main():
     while True:
+        # Choose manual or automated scanning
         usage_type = input(
             """
                         please select an option:
@@ -105,6 +109,7 @@ def main():
                 usage_type = default
             loop = True
 
+            # Check for conflicting search settings
             if (
                 config["SEARCH SETTINGS"]["STEALTH SEARCH"] == "True"
                 and config["SEARCH SETTINGS"]["Identify Service Version"] == "True"
@@ -113,6 +118,7 @@ def main():
                     'Stealth and cpe cannot be active at the same time! ignoring "Identify Service Version"'
                 )
 
+            # Set Nmap arguments based on configuration
             if (
                 config["SEARCH SETTINGS"]["Identify Service Version"] == "True"
                 and config["SEARCH SETTINGS"]["STEALTH SEARCH"] == "False"
@@ -175,7 +181,6 @@ def main():
                         df_net_info = pd.DataFrame.from_dict(info["ports"])
 
                         if host in ip_results:
-                            print(ip_results)
                             old_df = ip_results[host]
                             if df_net_info.equals(old_df):
                                 pass
@@ -233,7 +238,7 @@ def main():
             time.sleep(int(config["MISC SETTINGS"]["SLEEP"]))
             print(f"\n\n[{now}] Searching for new IPs...")
 
-
+# Entry point of the script
 if __name__ == "__main__":
     subnets = ["127.0.0.1"]
     directories()
