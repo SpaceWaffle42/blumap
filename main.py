@@ -158,7 +158,10 @@ def main():
                 else:
                     print("Performing Stealth Search...")
             else:
-                sub_scan = nmap.nmap_subnet_scan(target_subnet, args=sub_scan_arg)
+                if '/' in target_subnet:
+                    sub_scan = nmap.scan_top_ports(target_subnet, args=sub_scan_arg)
+                else:
+                    sub_scan = nmap.nmap_subnet_scan(target_subnet, args=sub_scan_arg)
             for host, info in sub_scan.items():
                 try:
                     state = info["state"]["state"]
@@ -183,11 +186,9 @@ def main():
                             )
                             df = df.map(replace_empty_list)
                             df.to_csv("data/" + f"{host}_scan.csv")
-
-                        if config["DATA SETTINGS"]["VIEW DATA"] == "True":
-                            pass
-                            print(f"\n{host}\n{df}")
-
+                            if config["DATA SETTINGS"]["VIEW DATA"] == "True":
+                                print(f"\n{host}\n{df}")
+                                
                     if host not in addresses and state == "up":
                         addresses.append(host)
                         print(f"[{now}] new address found: {host}")
@@ -202,7 +203,7 @@ def main():
 
         if loop == True:
             time.sleep(int(config["MISC SETTINGS"]["SLEEP"]))
-            print(f"[{now}] Searching for new IPs...")
+            print(f"\n\n[{now}] Searching for new IPs...")
 
 
 if __name__ == "__main__":
