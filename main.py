@@ -17,6 +17,8 @@ addresses = []
 subnets = []
 nmap = Nmap()
 
+ip_results = {}  # for use with comparing ips
+
 
 def directories():
     DIR_DATA = os.path.join(py_path, "data")
@@ -81,7 +83,6 @@ def initial():
 
 
 def main():
-    old_df = pd.DataFrame()
     while True:
         usage_type = input(
             """
@@ -158,7 +159,7 @@ def main():
                 else:
                     print("Performing Stealth Search...")
             else:
-                if '/' in target_subnet:
+                if "/" in target_subnet:
                     sub_scan = nmap.scan_top_ports(target_subnet, args=sub_scan_arg)
                 else:
                     sub_scan = nmap.nmap_subnet_scan(target_subnet, args=sub_scan_arg)
@@ -173,10 +174,36 @@ def main():
                         df_device_info = pd.DataFrame.from_dict(os)
                         df_net_info = pd.DataFrame.from_dict(info["ports"])
 
-                        if df_net_info.equals(old_df):
-                            pass
+                        if host in ip_results:
+                            print(ip_results)
+                            old_df = ip_results[host]
+                            if df_net_info.equals(old_df):
+                                pass
+                            else:
+                                df_changes = df_net_info.compare(old_df)
+                                print(f"[{now}] Changes for {host}:\n{df_changes}")
+
+                                ip_results[host] = df_net_info
+
+                                df = pd.concat(
+                                    [df_device_info, df_net_info], ignore_index=True
+                                )
+                                df = df.set_index("os")
+                                replace_empty_list = (
+                                    lambda x: np.nan
+                                    if isinstance(x, list) and not x
+                                    else x
+                                )
+                                df = df.applymap(replace_empty_list)
+                                df.to_csv("data/" + f"{host}_scan.csv")
+
+                                if config["DATA SETTINGS"]["VIEW DATA"] == "True":
+                                    print(f"\n[{now}] {host}\n{df}")
                         else:
-                            old_df = df_net_info
+                            print(f"[{now}] Initial scan for {host}:\n{df_net_info}")
+
+                            ip_results[host] = df_net_info
+
                             df = pd.concat(
                                 [df_device_info, df_net_info], ignore_index=True
                             )
@@ -186,9 +213,10 @@ def main():
                             )
                             df = df.map(replace_empty_list)
                             df.to_csv("data/" + f"{host}_scan.csv")
+
                             if config["DATA SETTINGS"]["VIEW DATA"] == "True":
                                 print(f"\n[{now}] {host}\n{df}")
-                                
+
                     if host not in addresses and state == "up":
                         addresses.append(host)
                         print(f"[{now}] new address found: {host}")
@@ -208,8 +236,8 @@ def main():
 
 if __name__ == "__main__":
     subnets = ["127.0.0.1"]
-directories()
-config_create()
-pd.set_option("display.max_rows", int(config["DATA SETTINGS"]["MAX ROW"]))
-initial()
-main()
+    directories()
+    config_create()
+    pd.set_option("display.max_rows", int(config["DATA SETTINGS"]["MAX ROW"]))
+    initial()
+    main()
