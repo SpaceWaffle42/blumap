@@ -46,7 +46,7 @@ def config_create():
 
         config.add_section("MISC SETTINGS")
         config.set("MISC SETTINGS", "DEFAULT USAGE", "1")
-        config.set("MISC SETTINGS", "SLEEP", "10")
+        config.set("MISC SETTINGS", "SLEEP", "3")
         config.set("MISC SETTINGS", "IP ONLY MODE", "False")
 
         with open((os.path.join(py_path, "config.ini")), "w") as configfile:
@@ -219,7 +219,9 @@ def main():
                             )
                             df = df.set_index("os")
                             replace_empty_list = (
-                                lambda x: np.nan if isinstance(x, list) and not x else x
+                                lambda x: np.nan 
+                                if isinstance(x, list) and not x 
+                                else x
                             )
                             df = df.map(replace_empty_list)
                             df.to_csv("data/" + f"{host}_scan.csv")
@@ -246,7 +248,6 @@ def main():
 
 # Entry point of the script
 if __name__ == "__main__":
-    subnets = ["127.0.0.1"]
     directories()
     config_create()
     pd.set_option("display.max_rows", int(config["DATA SETTINGS"]["MAX ROW"]))
