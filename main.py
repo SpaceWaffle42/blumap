@@ -1,5 +1,5 @@
 from nmap3 import Nmap
-import pandas as pd, numpy as np
+import pandas as pd
 import ipaddress
 import configparser
 import pathlib, os
@@ -22,10 +22,10 @@ nmap = Nmap()  # Nmap object for scanning
 
 ip_results = {}  # Dictionary to store scan results for each IP address
 
+DIR_DATA = os.path.join(py_path, "data")
 
 # Function to create the 'data' directory if it doesn't exist
 def directories():
-    DIR_DATA = os.path.join(py_path, "data")
     dir_check_data = os.path.isdir(DIR_DATA)
 
     if dir_check_data == False:
@@ -175,23 +175,28 @@ def main():
                 else:
                     sub_scan = nmap.nmap_subnet_scan(target_subnet, args=sub_scan_arg)
             for host, info in sub_scan.items():
+
                 try:
                     state = info["state"]["state"]
 
                     if state == "up":
                         os_name = info["osmatch"][0]["name"]
                         os_accuracy = info["osmatch"][0]["accuracy"]
-                        os = [{"os": os_name, "os accuracy": os_accuracy + "%"}]
-                        df_device_info = pd.DataFrame.from_dict(os)
+                        operating_system = [{"os": os_name, "os accuracy": os_accuracy + "%"}]
+                        df_device_info = pd.DataFrame.from_dict(operating_system)
                         df_net_info = pd.DataFrame.from_dict(info["ports"])
-
+                          
+                        df_dir = os.path.join(DIR_DATA, f"{host}_scan.csv")
+                        
                         if host in ip_results:
+
                             old_df = ip_results[host]
                             if df_net_info.equals(old_df):
                                 pass
                             else:
                                 df_changes = df_net_info.compare(old_df)
-                                print(f"[{now}] Changes for {host}:\n{df_changes}")
+                                for _, row in df_changes.iterrows():
+                                    print(f"[{now}] Changes for {host} on Port {row.name}: {row['self']} to {row['other']}\n{df_changes}")
 
                                 ip_results[host] = df_net_info
 
@@ -199,18 +204,12 @@ def main():
                                     [df_device_info, df_net_info], ignore_index=True
                                 )
                                 df = df.set_index("os")
-                                replace_empty_list = (
-                                    lambda x: np.nan
-                                    if isinstance(x, list) and not x
-                                    else x
-                                )
-                                df = df.map(replace_empty_list)
-                                df.to_csv("data/" + f"{host}_scan.csv")
+
+                                df.to_csv(df_dir)
 
                                 if config["DATA SETTINGS"]["VIEW DATA"] == "True":
                                     print(f"\n[{now}] {host}\n{df}")
                         else:
-                            print(f"[{now}] Initial scan for {host}:\n{df_net_info}")
 
                             ip_results[host] = df_net_info
 
@@ -218,13 +217,9 @@ def main():
                                 [df_device_info, df_net_info], ignore_index=True
                             )
                             df = df.set_index("os")
-                            replace_empty_list = (
-                                lambda x: np.nan 
-                                if isinstance(x, list) and not x 
-                                else x
-                            )
-                            df = df.map(replace_empty_list)
-                            df.to_csv("data/" + f"{host}_scan.csv")
+
+                            print(f"[{now}] Initial scan for {host}:\n{df}")
+                            df.to_csv(df_dir)
 
                             if config["DATA SETTINGS"]["VIEW DATA"] == "True":
                                 print(f"\n[{now}] {host}\n{df}")
