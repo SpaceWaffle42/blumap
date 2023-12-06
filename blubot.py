@@ -82,7 +82,7 @@ async def post_to_channels(guild, data, file_name):
     if channel is None:
         channel = await guild.create_text_channel(channel_name, category=category)
     else:
-        await purge_old_messages(channel, limit=2)
+        await purge_old_messages(channel, limit=100)
 
     # Check for changes and get the row number(s) of the changed item(s)
     changes = get_changes(data, file_name)
@@ -90,7 +90,7 @@ async def post_to_channels(guild, data, file_name):
     # If changes are detected, create a new embed with highlighted changes
     if changes:
         embed = create_embed(data, changes)
-        await channel.send(embed=embed, content="**Changes Detected in the following item(s):**")
+        await channel.send(embed=embed, content="**@everyone Changes Detected in the following item(s):**")
     else:
         embed = create_embed(data)
         await channel.send(embed=embed)
@@ -144,9 +144,12 @@ def create_embed(data, changes=None):
         reason_ttl_list = [reason_ttl_list[i] for i in changes]
 
     time_now = datetime.datetime.now().strftime("%Y-%m-%d @%H:%M")
-    port_id_protocol_list.pop(0)
-    state_list.pop(0)
-    reason_ttl_list.pop(0)
+    if port_id_protocol_list[0] == " ()" or port_id_protocol_list[0] =='':
+            port_id_protocol_list.pop(0)
+    if state_list[0] == " ()" or state_list[0] =='':
+        state_list.pop(0)
+    if reason_ttl_list[0] == " ()" or reason_ttl_list[0] =='':
+        reason_ttl_list.pop(0)
     # Join the lists with '\n' and set as field values
     embed.add_field(name="PortID (protocol)", value='\n'.join(port_id_protocol_list), inline=True)
     embed.add_field(name="State", value='\n'.join(state_list), inline=True)
