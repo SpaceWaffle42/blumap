@@ -7,10 +7,10 @@ import re
 import datetime
 import configparser
 import pathlib
+import copy  # Added import for copy module
 
 config = configparser.ConfigParser()
 py_path = pathlib.Path(__file__).parent.resolve()
-
 
 config.read(os.path.join(py_path, "config.ini"))
 
@@ -55,10 +55,12 @@ async def scan_csv_and_post():
             # Post to channels
             guild_id = int(config["DISCORD SETTINGS"]["GUILD"])  # Replace with your actual guild ID
             guild = discord.utils.get(bot.guilds, id=guild_id)
+
+            # Create a new embed with changes
             await post_to_channels(guild, data, file_name)
 
             # Update previous_data and last_modification_time
-            previous_data[file_name] = data
+            previous_data[file_name] = copy.deepcopy(data)
             last_modification_time[file_name] = last_mod_time
 
 def read_csv(file_path):
@@ -82,8 +84,16 @@ async def post_to_channels(guild, data, file_name):
     else:
         await purge_old_messages(channel, limit=2)
 
-    embed = create_embed(data)
-    await channel.send(embed=embed)
+    # Check for changes and get the row number(s) of the changed item(s)
+    changes = get_changes(data, file_name)
+
+    # If changes are detected, create a new embed with highlighted changes
+    if changes:
+        embed = create_embed(data, changes)
+        await channel.send(embed=embed, content="**Changes Detected in the following item(s):**")
+    else:
+        embed = create_embed(data)
+        await channel.send(embed=embed)
 
 async def purge_old_messages(channel, limit):
     # Fetch the messages in the channel
@@ -103,7 +113,7 @@ async def purge_old_messages(channel, limit):
         for i in range(delete_count):
             await messages[i].delete()
 
-def create_embed(data):
+def create_embed(data, changes=None):
     try:
         opsys = data[0]['os']
     except:
@@ -112,7 +122,8 @@ def create_embed(data):
         opsysacc = data[0]['os accuracy']
     except:
         opsysacc = data[0]
-    embed = discord.Embed(title=f'{opsys} ({opsysacc})', color=discord.Color.blurple())
+    embed_color = discord.Color.red() if changes else discord.Color.blurple()
+    embed = discord.Embed(title=f'{opsys} ({opsysacc})', color=embed_color)
 
     # Create lists for each field
     port_id_protocol_list = []
@@ -124,8 +135,15 @@ def create_embed(data):
         port_id_protocol_list.append(f"{row.get('portid', 'N/A')} ({row.get('protocol', 'N/A')})")
         state_list.append(row.get("state", "N/A"))
         reason_ttl_list.append(f"{row.get('reason', 'N/A')} ({row.get('reason_ttl','N/A')})")
-    time_now = datetime.datetime.now().strftime("%Y-%m-%d @%H:%M")
 
+    # Check if changes are provided and highlight them
+    if changes:
+        # Keep only the changed items in the lists
+        port_id_protocol_list = [port_id_protocol_list[i] for i in changes]
+        state_list = [state_list[i] for i in changes]
+        reason_ttl_list = [reason_ttl_list[i] for i in changes]
+
+    time_now = datetime.datetime.now().strftime("%Y-%m-%d @%H:%M")
     port_id_protocol_list.pop(0)
     state_list.pop(0)
     reason_ttl_list.pop(0)
@@ -135,5 +153,14 @@ def create_embed(data):
     embed.add_field(name="Reason (TTL)", value='\n'.join(reason_ttl_list), inline=True)
     embed.set_footer(text=f'Updated: {time_now}')
     return embed
+
+def get_changes(data, file_name):
+    changes = []
+    if file_name in previous_data:
+        previous_rows = previous_data[file_name]
+        for i, row in enumerate(data):
+            if row != previous_rows[i]:
+                changes.append(i)
+    return changes
 
 bot.run(config["DISCORD SETTINGS"]["BOT TOKEN"])

@@ -220,14 +220,14 @@ def main():
                                 [df_device_info, df_net_info], ignore_index=True
                             )
                             df = df.set_index("os")
-                            if config["DATA SETTINGS"]["VIEW DATA"] == "True":
-                                print(f"[{now}] Initial scan for {host}:\n{df}")
-                            else:
-                                print(f"[{now}] Initial scan for {host}")
                             df.to_csv(df_dir)
 
+                            print(f"\n[{now}] {host}\n")
                             if config["DATA SETTINGS"]["VIEW DATA"] == "True":
-                                print(f"\n[{now}] {host}\n{df}")
+                                print(f"[{now}] Initial scan for {host}:\n{df}")
+
+                            if config["DATA SETTINGS"]["VIEW DATA"] == "False":
+                                print(f"[{now}] Initial scan for {host}")
 
                     if host not in addresses and state == "up":
                         addresses.append(host)
