@@ -25,9 +25,10 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 py_path = Path(__file__).parent.resolve()
 DIR_DATA = os.path.join(py_path, "data")
 
-# Store previous data and last modification time to check for changes
+# Store previous data, last modification time, and last IP status to check for changes
 previous_data = {}
 last_modification_time = {}
+last_ip_status = {}
 
 @bot.event
 async def on_ready():
@@ -50,55 +51,66 @@ async def scan_csv_and_post():
 
             # Additional debugging info
             last_mod_time = os.path.getmtime(file_path)
-            # print(f"Last Modification Time: {last_mod_time}")
-            # print(f"Previous Modification Time: {last_modification_time.get(file_name)}")
 
             # Post to channels
             guild_id = int(config["DISCORD SETTINGS"]["GUILD"])  # Replace with your actual guild ID
             guild = discord.utils.get(bot.guilds, id=guild_id)
 
-            # Create a new embed with changes
-            await post_to_channels(guild, data, file_name)
+            # Check if dedicated channel for port changes is configured
+            if config["DISCORD SETTINGS"]["PORT CHANGES CHANNEL"] == 'True':
+                # Check for changes and get the row number(s) of the changed item(s)
+                changes = get_changes(data, file_name)
 
-            # Update previous_data and last_modification_time
+                # If changes are detected, create a new embed with highlighted changes
+                if changes:
+                    port_changes_channel = discord.utils.get(guild.channels, name='port-changes')
+                    if port_changes_channel is None:
+                        port_changes_channel = await guild.create_text_channel('port-changes')
+                    channel = port_changes_channel
+
+                    # Get the original channel where the CSV was initially posted
+                    original_channel_name = str(file_name).replace('.', '_').replace('_scan', '')
+                    original_channel = discord.utils.get(guild.channels, name=original_channel_name)
+                    original_channel_mention = f"<#{original_channel.id}>"
+                else:
+                    # Use the regular channel creation logic
+                    subnet_name = file_name.replace("_scan", "")
+                    subnet_category_name = re.sub(r'\.\d+$', '.0', subnet_name)  # Replace the last octet with .0
+                    category = discord.utils.get(guild.categories, name=subnet_category_name)
+                    if category is None:
+                        category = await guild.create_category_channel(subnet_category_name)
+
+                    channel_name = str(file_name).replace('.', '_').replace('_scan', '')
+                    channel = discord.utils.get(guild.channels, name=channel_name, category=category)
+
+                    if channel is None:
+                        channel = await guild.create_text_channel(channel_name, category=category)
+                    else:
+                        await purge_old_messages(channel, limit=100)
+
+                    # Get the channel mention ID
+                    original_channel_mention = f"<#{channel.id}>"
+
+                # If changes are detected, create a new embed with highlighted changes
+                if changes:
+                    embed = create_embed(data, changes)
+                    time_now = datetime.datetime.now().strftime("%Y-%m-%d @%H:%M")
+                    await channel.send(embed=embed, content=f"**@everyone Changes Detected in {original_channel_mention} on {time_now} in the following item(s):**")
+                else:
+                    embed = create_embed(data)
+                    await channel.send(embed=embed)
+
+            # Update previous_data, last_modification_time, and last IP status
             previous_data[file_name] = copy.deepcopy(data)
             last_modification_time[file_name] = last_mod_time
+
+            # Asynchronously check IP availability every 3 seconds
+            await check_ip_availability(guild, data, file_name)
 
 def read_csv(file_path):
     with open(file_path, 'r') as file:
         reader = csv.DictReader(file)
         return [row for row in reader]
-
-async def post_to_channels(guild, data, file_name):
-    time_now = datetime.datetime.now().strftime("%Y-%m-%d @%H:%M")
-    subnet_name = file_name.replace("_scan", "")
-    subnet_category_name = re.sub(r'\.\d+$', '.0', subnet_name)  # Replace the last octet with .0
-
-    category = discord.utils.get(guild.categories, name=subnet_category_name)
-    if category is None:
-        category = await guild.create_category_channel(subnet_category_name)
-
-    channel_name = str(file_name).replace('.', '_').replace('_scan', '')  # You can change this as needed
-    channel = discord.utils.get(guild.channels, name=channel_name, category=category)
-
-    if channel is None:
-        channel = await guild.create_text_channel(channel_name, category=category)
-    else:
-        await purge_old_messages(channel, limit=100)
-
-    # Check for changes and get the row number(s) of the changed item(s)
-    changes = get_changes(data, file_name)
-
-    # If changes are detected, create a new embed with highlighted changes
-    if changes:
-        embed = create_embed(data, changes)
-        await channel.send(embed=embed, content="**@everyone Changes Detected in the following item(s):**")
-    else:
-        embed = create_embed(data)
-        await channel.send(embed=embed)
-
-    # Asynchronous check for IP availability
-    await check_ip_availability(channel, subnet_name,time_now)
 
 async def purge_old_messages(channel, limit):
     # Fetch the messages in the channel
@@ -171,17 +183,34 @@ def get_changes(data, file_name):
                 changes.append(i)
     return changes
 
-async def check_ip_availability(channel, subnet_name,time_now):
-    # Extract IP address from the subnet category name
+async def check_ip_availability(guild, data, file_name):
+    time_now = datetime.datetime.now().strftime("%Y-%m-%d @%H:%M")
+    subnet_name = file_name.replace("_scan", "")
     ip_match = re.search(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b', subnet_name)
-    
+
     if ip_match:
         ip_address = ip_match.group()
         try:
-            # Use aioping to check if the IP is online
             await aioping.ping(ip_address)
+            current_ip_status = "up"
+            disc_colour = discord.Color.green()
         except TimeoutError:
-            # If the IP is not responding, post a yellow embed message
-            await channel.send(embed=discord.Embed(title=f"{ip_address} not responding or down!\nas of {time_now}", color=discord.Color.gold()))
+            current_ip_status = "down"
+            disc_colour = discord.Color.gold()
+
+        # Check if the IP status has changed
+        if current_ip_status != last_ip_status.get(file_name):
+            last_ip_status[file_name] = current_ip_status
+
+            # IP status has changed, send a message
+            channel_name = str(file_name).replace('.', '_').replace('_scan', '')
+
+            if config["DISCORD SETTINGS"]["IP STATE CHANNEL"] == 'False':
+                channel = discord.utils.get(guild.channels, name=channel_name)
+            else:
+                channel = discord.utils.get(guild.channels, name='IP States')
+
+            if channel is not None:
+                await channel.send(embed=discord.Embed(title=f"{ip_address} is {current_ip_status}!\nas of {time_now}", color=disc_colour))
 
 bot.run(config["DISCORD SETTINGS"]["BOT TOKEN"])
