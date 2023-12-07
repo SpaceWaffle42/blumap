@@ -7,7 +7,8 @@ import re
 import datetime
 import configparser
 import pathlib
-import copy  # Added import for copy module
+import copy
+import aioping
 
 config = configparser.ConfigParser()
 py_path = pathlib.Path(__file__).parent.resolve()
@@ -45,12 +46,12 @@ async def scan_csv_and_post():
 
         # Check if data has changed
         if data != previous_data.get(file_name):
-            print(f"Change detected in {file_name}.csv. Updating...")
+            print(f"\nChange detected in {file_name}.csv. Updating...")
 
             # Additional debugging info
             last_mod_time = os.path.getmtime(file_path)
-            print(f"Last Modification Time: {last_mod_time}")
-            print(f"Previous Modification Time: {last_modification_time.get(file_name)}")
+            # print(f"Last Modification Time: {last_mod_time}")
+            # print(f"Previous Modification Time: {last_modification_time.get(file_name)}")
 
             # Post to channels
             guild_id = int(config["DISCORD SETTINGS"]["GUILD"])  # Replace with your actual guild ID
@@ -69,8 +70,9 @@ def read_csv(file_path):
         return [row for row in reader]
 
 async def post_to_channels(guild, data, file_name):
-    subnet_category_name = file_name.replace("_scan", "")
-    subnet_category_name = re.sub(r'\.\d+$', '.0', subnet_category_name)  # Replace the last octet with .0
+    time_now = datetime.datetime.now().strftime("%Y-%m-%d @%H:%M")
+    subnet_name = file_name.replace("_scan", "")
+    subnet_category_name = re.sub(r'\.\d+$', '.0', subnet_name)  # Replace the last octet with .0
 
     category = discord.utils.get(guild.categories, name=subnet_category_name)
     if category is None:
@@ -94,6 +96,9 @@ async def post_to_channels(guild, data, file_name):
     else:
         embed = create_embed(data)
         await channel.send(embed=embed)
+
+    # Asynchronous check for IP availability
+    await check_ip_availability(channel, subnet_name,time_now)
 
 async def purge_old_messages(channel, limit):
     # Fetch the messages in the channel
@@ -165,5 +170,18 @@ def get_changes(data, file_name):
             if row != previous_rows[i]:
                 changes.append(i)
     return changes
+
+async def check_ip_availability(channel, subnet_name,time_now):
+    # Extract IP address from the subnet category name
+    ip_match = re.search(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b', subnet_name)
+    
+    if ip_match:
+        ip_address = ip_match.group()
+        try:
+            # Use aioping to check if the IP is online
+            await aioping.ping(ip_address)
+        except TimeoutError:
+            # If the IP is not responding, post a yellow embed message
+            await channel.send(embed=discord.Embed(title=f"{ip_address} not responding or down!\nas of {time_now}", color=discord.Color.gold()))
 
 bot.run(config["DISCORD SETTINGS"]["BOT TOKEN"])
