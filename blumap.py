@@ -52,6 +52,9 @@ def config_create():
         config.add_section("DISCORD SETTINGS")
         config.set("DISCORD SETTINGS","GUILD","PROVIDE YOUR GUILD ID")
         config.set("DISCORD SETTINGS","BOT TOKEN","PROVIDE YOUR BOT TOKEN")
+        config.set("DISCORD SETTINGS","IP STATE CHANNEL","False")
+        config.set("DISCORD SETTINGS","PORT CHANGES CHANNEL","False")
+
         with open((os.path.join(py_path, "config.ini")), "w") as configfile:
             config.write(configfile)
     return config
