@@ -9,6 +9,7 @@ import configparser
 import pathlib
 import copy
 import aioping
+from concurrent.futures import ThreadPoolExecutor
 
 config = configparser.ConfigParser()
 py_path = pathlib.Path(__file__).parent.resolve()
@@ -30,6 +31,9 @@ previous_data = {}
 last_modification_time = {}
 last_ip_status = {}
 
+# Use a ThreadPoolExecutor for concurrent processing
+executor = ThreadPoolExecutor(max_workers=2)
+
 @bot.event
 async def on_ready():
     print(f'We have logged in as {bot.user}')
@@ -38,19 +42,24 @@ async def on_ready():
 @tasks.loop(seconds=3)
 async def scan_csv_and_post():
     data_path = Path(DIR_DATA)
+    futures = []
 
     for file_path in data_path.glob("*_scan.csv"):
         file_name = file_path.stem
 
-        # Read the CSV file
-        data = read_csv(file_path)
+        # Read the CSV file asynchronously using ThreadPoolExecutor
+        future = executor.submit(read_csv, file_path)
+        futures.append((file_name, future))
+
+    for file_name, future in futures:
+        data = future.result()
 
         # Check if data has changed
         if data != previous_data.get(file_name):
             print(f"\nChange detected in {file_name}.csv. Updating...")
 
             # Additional debugging info
-            last_mod_time = os.path.getmtime(file_path)
+            last_mod_time = os.path.getmtime(data_path / f"{file_name}.csv")
 
             # Post to channels
             guild_id = int(config["DISCORD SETTINGS"]["GUILD"])  # Replace with your actual guild ID
