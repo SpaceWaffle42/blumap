@@ -187,7 +187,8 @@ async def check_ip_availability(guild, data, file_name):
     time_now = datetime.datetime.now().strftime("%Y-%m-%d @%H:%M")
     subnet_name = file_name.replace("_scan", "")
     ip_match = re.search(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b', subnet_name)
-
+    
+    channel = None
     if ip_match:
         ip_address = ip_match.group()
         try:
@@ -227,7 +228,6 @@ async def check_ip_availability(guild, data, file_name):
                 if channel is None:
                                     try:
                                         channel = await guild.create_text_channel('ip-states')
-                                        print(f"Created IP States Channel: IP-States")
                                     except discord.Forbidden:
                                         print("Bot lacks 'manage_channels' permission to create channels.")
                                         # Handle this situation according to your needs
