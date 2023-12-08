@@ -161,11 +161,11 @@ def create_embed(data, changes=None):
         reason_ttl_list = [reason_ttl_list[i] for i in changes]
 
     time_now = datetime.datetime.now().strftime("%Y-%m-%d @%H:%M")
-    if port_id_protocol_list[0] == " ()" or port_id_protocol_list[0] =='':
+    if port_id_protocol_list and port_id_protocol_list[0] == " ()" or port_id_protocol_list[0] =='':
             port_id_protocol_list.pop(0)
-    if state_list[0] == " ()" or state_list[0] =='':
+    if state_list and state_list[0] == " ()" or state_list[0] =='':
         state_list.pop(0)
-    if reason_ttl_list[0] == " ()" or reason_ttl_list[0] =='':
+    if reason_ttl_list and reason_ttl_list[0] == " ()" or reason_ttl_list[0] =='':
         reason_ttl_list.pop(0)
     # Join the lists with '\n' and set as field values
     embed.add_field(name="PortID (protocol)", value='\n'.join(port_id_protocol_list), inline=True)
@@ -204,13 +204,39 @@ async def check_ip_availability(guild, data, file_name):
 
             # IP status has changed, send a message
             channel_name = str(file_name).replace('.', '_').replace('_scan', '')
-
+            channel = discord.utils.get(guild.channels, name=channel_name)
+            ip_states_channel_mention = f"<#{channel.id}>" if channel is not None else ''
             if config["DISCORD SETTINGS"]["IP STATE CHANNEL"] == 'False':
-                channel = discord.utils.get(guild.channels, name=channel_name)
-            else:
-                channel = discord.utils.get(guild.channels, name='IP States')
+                # Use the original channel's name for the IP States channel
+                channel_name = str(file_name).replace('.', '_').replace('_scan', '')
 
-            if channel is not None:
-                await channel.send(embed=discord.Embed(title=f"{ip_address} is {current_ip_status}!\nas of {time_now}", color=disc_colour))
+
+                # Create the IP States channel if it doesn't exist
+                if channel is None:
+                    try:
+                        channel = await guild.create_text_channel(channel_name)
+                        print(f"Created IP States Channel: {channel_name}")
+                    except discord.Forbidden:
+                        print("Bot lacks 'manage_channels' permission to create channels.")
+                        # Handle this situation according to your needs
+
+            else:
+                # Use the predefined "IP-States" channel
+                channel = discord.utils.get(guild.channels, name='ip-states')
+                # ip_states_channel_mention = '<#IP-States>'  # Mention the "IP-States" channel
+                if channel is None:
+                                    try:
+                                        channel = await guild.create_text_channel('ip-states')
+                                        print(f"Created IP States Channel: IP-States")
+                                    except discord.Forbidden:
+                                        print("Bot lacks 'manage_channels' permission to create channels.")
+                                        # Handle this situation according to your needs
+        if channel is not None:
+            # Send the IP status with a mention of the original channel
+            await channel.send(embed=discord.Embed(
+                title=f"{ip_address} is {current_ip_status}!\nas of {time_now}",
+                description=f"Original Channel: {ip_states_channel_mention}",
+                color=disc_colour
+            ))
 
 bot.run(config["DISCORD SETTINGS"]["BOT TOKEN"])
